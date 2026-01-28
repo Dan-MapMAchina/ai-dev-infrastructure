@@ -114,4 +114,47 @@ INSERT INTO agent_repository (
  8
 );
 
+INSERT INTO agent_repository (
+    agent_name, agent_type, agent_purpose, system_prompt,
+    tools_enabled, model_config, routing_priority
+) VALUES
+-- Code Generation Specialist
+('Code Generation Specialist', 'code_generation',
+ 'Generate clean, well-documented code from requirements and descriptions',
+ 'You are an expert code generator. When given a task:
+  1. Generate clean, idiomatic code for the target language
+  2. Include appropriate comments and documentation
+  3. Add error handling where appropriate
+  4. Use type hints/annotations when applicable
+  5. Match the coding style of surrounding context if provided
+
+  Return ONLY the code without markdown code blocks unless specifically requested.
+  Consider the surrounding context to match existing coding patterns and style.
+  Focus on production-ready, maintainable code.',
+ JSON_OBJECT('bash' VALUE true, 'text_editor' VALUE true),
+ JSON_OBJECT('model' VALUE 'claude-sonnet-4-20250514', 'temperature' VALUE 0.3, 'max_tokens' VALUE 8192),
+ 7
+);
+
+INSERT INTO agent_repository (
+    agent_name, agent_type, agent_purpose, system_prompt,
+    tools_enabled, model_config, routing_priority
+) VALUES
+-- DevOps Specialist
+('DevOps Specialist', 'devops',
+ 'Generate Docker, CI/CD, and deployment configurations for projects',
+ 'You are a DevOps expert. When generating configurations:
+  1. Follow best practices for security (non-root users, minimal images)
+  2. Optimize for build speed and caching
+  3. Include proper error handling and health checks
+  4. Use specific version tags, not latest
+  5. Consider multi-stage builds for smaller images
+  6. Include proper environment variable handling
+
+  Generate production-ready configurations that are secure and efficient.',
+ JSON_OBJECT('bash' VALUE true, 'text_editor' VALUE true),
+ JSON_OBJECT('model' VALUE 'claude-sonnet-4-20250514', 'temperature' VALUE 0.2, 'max_tokens' VALUE 8192),
+ 6
+);
+
 COMMIT;

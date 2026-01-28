@@ -2,6 +2,19 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import axios, { AxiosRequestConfig } from 'axios';
+import * as codeGeneration from './codeGeneration';
+import * as chatPersistence from './chatPersistence';
+import * as diagnosticsProvider from './diagnosticsProvider';
+import * as codeActionsProvider from './codeActionsProvider';
+import * as agentBrowser from './agentBrowser';
+import * as devopsGenerator from './devopsGenerator';
+import * as multiFileGenerator from './multiFileGenerator';
+import * as mcpToolExecutor from './mcpToolExecutor';
+import * as toolSelector from './toolSelector';
+import * as learningInsights from './learningInsights';
+import * as customRulesManager from './customRulesManager';
+import * as rbac from './rbac';
+import * as complianceDashboard from './complianceDashboard';
 
 const API_TIMEOUT = 60000; // 60 seconds
 
@@ -54,6 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register commands - get backendUrl dynamically for each call
     context.subscriptions.push(
+        // Original commands
         vscode.commands.registerCommand('claudeAiDev.chat', () => showChat(getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.codeReview', () => executeAgentTask('code_review', getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.reviewProject', () => reviewEntireProject(getBackendUrl())),
@@ -63,8 +77,220 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('claudeAiDev.viewDashboard', () => showDashboard(getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.initializeProject', () => initializeProject(getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.importExistingProject', () => importProject(getBackendUrl())),
-        vscode.commands.registerCommand('claudeAiDev.updateScope', () => updateProjectScope(getBackendUrl()))
+        vscode.commands.registerCommand('claudeAiDev.updateScope', () => updateProjectScope(getBackendUrl())),
+
+        // Phase 1: Code generation commands
+        vscode.commands.registerCommand('claudeAiDev.generateCode', () => codeGeneration.generateCodeAtCursor(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.acceptSuggestion', () => codeGeneration.acceptSuggestion()),
+        vscode.commands.registerCommand('claudeAiDev.rejectSuggestion', () => codeGeneration.rejectSuggestion(getBackendUrl())),
+
+        // Phase 1: Chat persistence commands
+        vscode.commands.registerCommand('claudeAiDev.loadChatHistory', () => loadChatHistory(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.saveChatSession', () => saveChatSession(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.newChatSession', () => newChatSession(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.exportChatSession', () => exportChatSession()),
+
+        // Phase 2: Diagnostics and Code Review commands
+        vscode.commands.registerCommand('claudeAiDev.reviewWithAnnotations', () =>
+            diagnosticsProvider.reviewWithDiagnostics(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.clearReviewAnnotations', () =>
+            diagnosticsProvider.clearAllDiagnostics()),
+        vscode.commands.registerCommand('claudeAiDev.applyAllFixes', (uri?: vscode.Uri) => {
+            const targetUri = uri || vscode.window.activeTextEditor?.document.uri;
+            if (targetUri) {
+                codeActionsProvider.applyAllFixes(targetUri);
+            } else {
+                vscode.window.showErrorMessage('No file selected');
+            }
+        }),
+        vscode.commands.registerCommand('claudeAiDev.explainIssue', (issue) =>
+            codeActionsProvider.explainIssue(issue)),
+
+        // Phase 2: Agent Browser commands
+        vscode.commands.registerCommand('claudeAiDev.browseAgents', () =>
+            agentBrowser.showAgentBrowser(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.selectAgent', () =>
+            agentBrowser.showAgentPicker(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.submitFeedback', async () => {
+            const agentId = agentBrowser.getSelectedAgentId();
+            if (agentId) {
+                const agents = await agentBrowser.fetchAgents(getBackendUrl());
+                const agent = agents.find(a => a.id === agentId);
+                if (agent) {
+                    await agentBrowser.showFeedbackDialog(agentId, agent.name, getBackendUrl());
+                }
+            } else {
+                vscode.window.showWarningMessage('No agent selected. Use "Browse Agents" first.');
+            }
+        }),
+        vscode.commands.registerCommand('claudeAiDev.clearAgentSelection', () =>
+            agentBrowser.clearAgentSelection()),
+
+        // Phase 2: DevOps commands
+        vscode.commands.registerCommand('claudeAiDev.generateDockerfile', () =>
+            devopsGenerator.generateDockerfile(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.generateCIPipeline', () =>
+            devopsGenerator.generateCIPipeline(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.generateDockerCompose', () =>
+            devopsGenerator.generateDockerCompose(getBackendUrl())),
+
+        // Phase 3: Multi-file generation commands
+        vscode.commands.registerCommand('claudeAiDev.generateFeature', () =>
+            multiFileGenerator.generateFeature(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.scaffoldProject', () =>
+            multiFileGenerator.scaffoldProject(getBackendUrl())),
+
+        // Phase 3: Tool execution commands
+        vscode.commands.registerCommand('claudeAiDev.executeTool', () =>
+            mcpToolExecutor.showToolExecutionDialog()),
+        vscode.commands.registerCommand('claudeAiDev.chainTools', () =>
+            mcpToolExecutor.showToolChainBuilder()),
+        vscode.commands.registerCommand('claudeAiDev.selectTool', async () => {
+            const context = toolSelector.detectTaskContext();
+            const tool = await toolSelector.showToolPicker(context);
+            if (tool) {
+                vscode.window.showInformationMessage(`Selected tool: ${tool.name}`);
+            }
+        }),
+        vscode.commands.registerCommand('claudeAiDev.showToolStatus', () =>
+            toolSelector.showToolConfigurationStatus()),
+
+        // Phase 3: Learning insights commands
+        vscode.commands.registerCommand('claudeAiDev.viewLearningInsights', async () => {
+            const agentId = agentBrowser.getSelectedAgentId();
+            await learningInsights.showLearningInsights(agentId || undefined);
+        }),
+
+        // Phase 4: Custom Rules commands
+        vscode.commands.registerCommand('claudeAiDev.manageCustomRules', () =>
+            customRulesManager.showCustomRulesManager(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.createCustomRule', () =>
+            customRulesManager.showQuickRuleCreation(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.testCustomRule', () =>
+            customRulesManager.testRuleOnSelection(getBackendUrl())),
+
+        // Phase 4: RBAC commands
+        vscode.commands.registerCommand('claudeAiDev.showPermissionStatus', () =>
+            rbac.showPermissionStatus(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.configureRBAC', () =>
+            rbac.showUserManagement(getBackendUrl())),
+
+        // Phase 4: Compliance commands
+        vscode.commands.registerCommand('claudeAiDev.viewComplianceReport', () =>
+            complianceDashboard.showComplianceDashboard(getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.exportAuditLog', async () => {
+            const format = await vscode.window.showQuickPick(
+                [
+                    { label: 'CSV', value: 'csv' },
+                    { label: 'JSON', value: 'json' }
+                ],
+                { placeHolder: 'Select export format' }
+            );
+            if (format) {
+                // Export all audit entries (no filter)
+                await complianceDashboard.exportAuditLog(
+                    format.value as 'csv' | 'json',
+                    {}, // Empty filter = all entries
+                    getBackendUrl()
+                );
+            }
+        })
     );
+
+    // Initialize Phase 2 components
+    diagnosticsProvider.initializeDiagnostics(context);
+    codeActionsProvider.registerCodeActionProvider(context);
+
+    // Initialize Phase 4 components
+    rbac.initializeStatusBar(context, getBackendUrl());
+}
+
+// Phase 1: Chat persistence helper functions
+
+async function loadChatHistory(backendUrl: string) {
+    const projectId = getProjectId();
+    const selection = await chatPersistence.showSessionPicker(projectId, backendUrl);
+
+    if (!selection) {
+        return;
+    }
+
+    if (selection === 'new') {
+        await newChatSession(backendUrl);
+        return;
+    }
+
+    // Load the selected session
+    const messages = await chatPersistence.loadChatSession(selection.id, backendUrl);
+
+    if (chatPanel) {
+        // Send loaded messages to the chat panel
+        for (const msg of messages) {
+            chatPanel.webview.postMessage({
+                type: msg.role === 'user' ? 'userMessage' : 'assistantMessage',
+                content: msg.content,
+                ...msg.metadata
+            });
+        }
+        vscode.window.showInformationMessage(`Loaded ${messages.length} messages from "${selection.name}"`);
+    } else {
+        // Open chat panel first, then load
+        await showChat(backendUrl);
+        setTimeout(async () => {
+            if (chatPanel) {
+                for (const msg of messages) {
+                    chatPanel.webview.postMessage({
+                        type: msg.role === 'user' ? 'userMessage' : 'assistantMessage',
+                        content: msg.content,
+                        ...msg.metadata
+                    });
+                }
+            }
+        }, 500);
+    }
+}
+
+async function saveChatSession(backendUrl: string) {
+    const saved = await chatPersistence.saveCurrentSession(backendUrl);
+    if (saved) {
+        vscode.window.showInformationMessage('Chat session saved');
+    } else {
+        vscode.window.showWarningMessage('No active session to save');
+    }
+}
+
+async function newChatSession(backendUrl: string) {
+    const sessionName = await vscode.window.showInputBox({
+        prompt: 'Enter a name for the new chat session',
+        placeHolder: 'My Chat Session'
+    });
+
+    if (!sessionName) {
+        return;
+    }
+
+    const projectId = getProjectId();
+    const session = await chatPersistence.createChatSession(projectId, sessionName, backendUrl);
+
+    if (session) {
+        vscode.window.showInformationMessage(`Created new session: "${session.name}"`);
+        // Clear the chat panel if open
+        if (chatPanel) {
+            chatPanel.webview.postMessage({ type: 'clearMessages' });
+        }
+    }
+}
+
+async function exportChatSession() {
+    const markdown = chatPersistence.exportSessionToMarkdown();
+
+    const doc = await vscode.workspace.openTextDocument({
+        content: markdown,
+        language: 'markdown'
+    });
+
+    await vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside);
+    vscode.window.showInformationMessage('Chat session exported to markdown');
 }
 
 async function showChat(backendUrl: string) {
@@ -100,6 +326,13 @@ async function handleChatMessage(text: string, backendUrl: string) {
     chatPanel.webview.postMessage({ type: 'userMessage', content: text });
     chatPanel.webview.postMessage({ type: 'loading', show: true });
 
+    // Save user message to chat persistence
+    await chatPersistence.addMessage({
+        role: 'user',
+        content: text,
+        timestamp: new Date().toISOString()
+    }, backendUrl);
+
     try {
         const projectId = getProjectId();
         const response = await axios.post(`${backendUrl}/execute-task`, {
@@ -108,13 +341,28 @@ async function handleChatMessage(text: string, backendUrl: string) {
             use_tools: true
         }, axiosConfig);
 
-        chatPanel.webview.postMessage({
+        const assistantMessage = {
             type: 'assistantMessage',
             content: response.data.result,
             route: response.data.route,
             agent: response.data.agent,
             metrics: response.data.metrics
-        });
+        };
+
+        chatPanel.webview.postMessage(assistantMessage);
+
+        // Save assistant message to chat persistence
+        await chatPersistence.addMessage({
+            role: 'assistant',
+            content: response.data.result,
+            timestamp: new Date().toISOString(),
+            metadata: {
+                route: response.data.route,
+                agent: response.data.agent,
+                tokens: response.data.metrics?.tokens,
+                time_ms: response.data.metrics?.time_ms
+            }
+        }, backendUrl);
     } catch (error: any) {
         chatPanel.webview.postMessage({
             type: 'error',
@@ -1378,6 +1626,8 @@ function getChatHtml(): string {
                 }
             } else if (msg.type === 'error') {
                 messagesDiv.innerHTML += '<div class="message error">' + escapeHtml(msg.content) + '</div>';
+            } else if (msg.type === 'clearMessages') {
+                messagesDiv.innerHTML = '';
             }
 
             messagesDiv.scrollTop = messagesDiv.scrollHeight;

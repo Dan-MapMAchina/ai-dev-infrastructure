@@ -61,6 +61,161 @@
         "command": "claudeAiDev.updateScope",
         "title": "Update Project Scope",
         "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.generateCode",
+        "title": "Generate Code at Cursor",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.acceptSuggestion",
+        "title": "Accept Code Suggestion",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.rejectSuggestion",
+        "title": "Reject Code Suggestion",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.loadChatHistory",
+        "title": "Load Chat Session",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.saveChatSession",
+        "title": "Save Chat Session",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.newChatSession",
+        "title": "New Chat Session",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.exportChatSession",
+        "title": "Export Chat to Markdown",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.reviewWithAnnotations",
+        "title": "Review Code with Inline Annotations",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.clearReviewAnnotations",
+        "title": "Clear Review Annotations",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.applyAllFixes",
+        "title": "Apply All Review Fixes",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.browseAgents",
+        "title": "Browse AI Agents",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.selectAgent",
+        "title": "Select Agent for Next Task",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.submitFeedback",
+        "title": "Submit Agent Feedback",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.clearAgentSelection",
+        "title": "Clear Agent Selection (Use Auto)",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.generateDockerfile",
+        "title": "Generate Dockerfile",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.generateCIPipeline",
+        "title": "Generate CI/CD Pipeline",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.generateDockerCompose",
+        "title": "Generate Docker Compose",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.generateFeature",
+        "title": "Generate Multi-File Feature",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.scaffoldProject",
+        "title": "Scaffold New Project",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.executeTool",
+        "title": "Execute MCP Tool",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.chainTools",
+        "title": "Build Tool Chain",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.selectTool",
+        "title": "Select Tool for Task",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.showToolStatus",
+        "title": "Show Tool Configuration Status",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.viewLearningInsights",
+        "title": "View Agent Learning Insights",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.manageCustomRules",
+        "title": "Manage Custom Review Rules",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.createCustomRule",
+        "title": "Create Custom Rule from Selection",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.testCustomRule",
+        "title": "Test Custom Rule on Selection",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.showPermissionStatus",
+        "title": "Show Permission Status",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.configureRBAC",
+        "title": "Manage Users (Admin)",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.viewComplianceReport",
+        "title": "View Compliance Dashboard",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.exportAuditLog",
+        "title": "Export Audit Log",
+        "category": "Claude AI"
       }
     ],
     "keybindings": [
@@ -88,6 +243,48 @@
         "command": "claudeAiDev.explainCode",
         "key": "ctrl+shift+e",
         "mac": "cmd+shift+e"
+      },
+      {
+        "command": "claudeAiDev.generateCode",
+        "key": "ctrl+shift+g",
+        "mac": "cmd+shift+g"
+      },
+      {
+        "command": "claudeAiDev.reviewWithAnnotations",
+        "key": "ctrl+alt+shift+r",
+        "mac": "cmd+alt+shift+r"
+      },
+      {
+        "command": "claudeAiDev.browseAgents",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "!terminalFocus"
+      },
+      {
+        "command": "claudeAiDev.generateFeature",
+        "key": "ctrl+shift+f",
+        "mac": "cmd+shift+f",
+        "when": "!terminalFocus && !searchViewletFocus"
+      },
+      {
+        "command": "claudeAiDev.executeTool",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t"
+      },
+      {
+        "command": "claudeAiDev.viewLearningInsights",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l"
+      },
+      {
+        "command": "claudeAiDev.manageCustomRules",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u"
+      },
+      {
+        "command": "claudeAiDev.viewComplianceReport",
+        "key": "ctrl+alt+c",
+        "mac": "cmd+alt+c"
       }
     ],
     "configuration": {
