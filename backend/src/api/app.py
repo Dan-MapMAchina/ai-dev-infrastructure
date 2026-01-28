@@ -24,6 +24,7 @@ CORS(app)
 # Global state
 router = None
 lite_mode = False
+claude_client = None  # For lite mode with API key
 
 # Default agents for lite mode
 DEFAULT_AGENTS = [
@@ -90,7 +91,7 @@ COMPLEX_KEYWORDS = [
 
 def init_router():
     """Try to initialize the full router, fall back to lite mode"""
-    global router, lite_mode
+    global router, lite_mode, claude_client
 
     try:
         from ..router.intelligent_router import IntelligentAgentRouter
@@ -101,6 +102,16 @@ def init_router():
         router = None
         lite_mode = True
         print(f"⚠ Lite mode: Database unavailable ({type(e).__name__})")
+
+        # Try to initialize Claude client for lite mode
+        api_key = os.getenv('ANTHROPIC_API_KEY')
+        if api_key:
+            try:
+                import anthropic
+                claude_client = anthropic.Anthropic(api_key=api_key)
+                print("✓ Lite mode: Claude API available")
+            except Exception as api_err:
+                print(f"⚠ Lite mode: Claude API unavailable ({type(api_err).__name__})")
 
 
 def classify_query(query: str) -> str:
@@ -210,20 +221,62 @@ def execute_task():
     else:
         route = classify_query(task)
 
-    # For lite mode or Ollama routing, return simulated response
+    # For lite mode or Ollama routing
     if lite_mode or route == 'ollama':
         agent = find_agent_for_task(task, agent_type)
         execution_time = int((time.time() - start_time) * 1000)
 
-        # In lite mode, we can't actually call the AI, so return a helpful message
+        # In lite mode, try to use Claude API if available
         if lite_mode:
+            if claude_client:
+                try:
+                    # Use Claude API directly in lite mode
+                    system_prompt = agent.get('system_prompt', 'You are an expert software development assistant.')
+                    response = claude_client.messages.create(
+                        model="claude-sonnet-4-20250514",
+                        max_tokens=8000,
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": task}]
+                    )
+
+                    response_text = ""
+                    for block in response.content:
+                        if hasattr(block, 'text'):
+                            response_text += block.text
+
+                    return jsonify({
+                        'route': 'claude',
+                        'agent': agent['name'],
+                        'agent_type': agent['type'],
+                        'result': response_text,
+                        'metrics': {
+                            'tokens': response.usage.input_tokens + response.usage.output_tokens,
+                            'time_ms': int((time.time() - start_time) * 1000)
+                        },
+                        'lite_mode': True
+                    })
+                except Exception as e:
+                    return jsonify({
+                        'route': 'claude',
+                        'agent': agent['name'],
+                        'agent_type': agent['type'],
+                        'result': f"Claude API error: {str(e)}",
+                        'error': str(e),
+                        'metrics': {
+                            'tokens': 0,
+                            'time_ms': int((time.time() - start_time) * 1000)
+                        },
+                        'lite_mode': True
+                    }), 500
+
+            # No Claude client available
             return jsonify({
                 'route': route,
                 'agent': agent['name'],
                 'agent_type': agent['type'],
                 'result': f"[Lite Mode] Task received: '{task[:100]}...'\n\n"
                          f"Agent '{agent['name']}' would process this task.\n"
-                         f"Start the Oracle database for full functionality.",
+                         f"Set ANTHROPIC_API_KEY for AI-powered responses.",
                 'metrics': {
                     'tokens': 0,
                     'time_ms': execution_time
