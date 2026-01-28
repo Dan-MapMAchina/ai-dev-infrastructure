@@ -1,0 +1,127 @@
+{
+  "name": "claude-ai-dev-assistant",
+  "displayName": "Claude AI Development Assistant",
+  "description": "AI-powered development with intelligent routing and agent management",
+  "version": "0.1.0",
+  "publisher": "ai-dev-infrastructure",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claudeAiDev.initializeProject",
+        "title": "Initialize AI-Enhanced Project",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.importExistingProject",
+        "title": "Import Existing Project",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.chat",
+        "title": "AI Chat (Intelligent Routing)",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.codeReview",
+        "title": "Review Selected Code",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.refactor",
+        "title": "Refactor Selected Code",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.generateTests",
+        "title": "Generate Tests",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.explainCode",
+        "title": "Explain Selected Code",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.viewDashboard",
+        "title": "View AI Dashboard",
+        "category": "Claude AI"
+      },
+      {
+        "command": "claudeAiDev.updateScope",
+        "title": "Update Project Scope",
+        "category": "Claude AI"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "claudeAiDev.chat",
+        "key": "ctrl+shift+a",
+        "mac": "cmd+shift+a"
+      },
+      {
+        "command": "claudeAiDev.codeReview",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r"
+      },
+      {
+        "command": "claudeAiDev.generateTests",
+        "key": "ctrl+shift+t",
+        "mac": "cmd+shift+t"
+      },
+      {
+        "command": "claudeAiDev.refactor",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r"
+      },
+      {
+        "command": "claudeAiDev.explainCode",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e"
+      }
+    ],
+    "configuration": {
+      "title": "Claude AI Development Assistant",
+      "properties": {
+        "claudeAiDev.backendUrl": {
+          "type": "string",
+          "default": "http://localhost:5000",
+          "description": "Backend service URL"
+        },
+        "claudeAiDev.autoRoute": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically route queries to optimal AI"
+        },
+        "claudeAiDev.showMetrics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show routing and cost metrics in responses"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0"
+  }
+}
