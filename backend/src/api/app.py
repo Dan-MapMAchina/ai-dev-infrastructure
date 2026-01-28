@@ -125,29 +125,45 @@ def classify_query(query: str) -> str:
 
 
 def find_agent_for_task(task: str, agent_type: str = None) -> dict:
-    """Find best agent for a task"""
+    """Find best agent for a task.
+
+    Returns agent dict with 'agent_id' key for compatibility with router output.
+    """
     task_lower = task.lower()
+    agent = None
 
     # Match by type if specified
     if agent_type:
-        for agent in DEFAULT_AGENTS:
-            if agent['type'] == agent_type:
-                return agent
+        for a in DEFAULT_AGENTS:
+            if a['type'] == agent_type:
+                agent = a
+                break
 
-    # Match by keywords
-    if any(kw in task_lower for kw in ['review', 'security', 'vulnerability']):
-        return DEFAULT_AGENTS[0]  # Code Review
-    if any(kw in task_lower for kw in ['refactor', 'clean', 'improve structure']):
-        return DEFAULT_AGENTS[1]  # Refactoring
-    if any(kw in task_lower for kw in ['test', 'coverage', 'unit test']):
-        return DEFAULT_AGENTS[2]  # Testing
-    if any(kw in task_lower for kw in ['architect', 'design', 'scale']):
-        return DEFAULT_AGENTS[3]  # Architecture
-    if any(kw in task_lower for kw in ['bug', 'debug', 'fix', 'error']):
-        return DEFAULT_AGENTS[4]  # Debugging
+    # Match by keywords if not found by type
+    if not agent:
+        if any(kw in task_lower for kw in ['review', 'security', 'vulnerability']):
+            agent = DEFAULT_AGENTS[0]  # Code Review
+        elif any(kw in task_lower for kw in ['refactor', 'clean', 'improve structure']):
+            agent = DEFAULT_AGENTS[1]  # Refactoring
+        elif any(kw in task_lower for kw in ['test', 'coverage', 'unit test']):
+            agent = DEFAULT_AGENTS[2]  # Testing
+        elif any(kw in task_lower for kw in ['architect', 'design', 'scale']):
+            agent = DEFAULT_AGENTS[3]  # Architecture
+        elif any(kw in task_lower for kw in ['bug', 'debug', 'fix', 'error']):
+            agent = DEFAULT_AGENTS[4]  # Debugging
+        else:
+            # Default to code review
+            agent = DEFAULT_AGENTS[0]
 
-    # Default to code review
-    return DEFAULT_AGENTS[0]
+    # Return agent with 'agent_id' key for compatibility with router output
+    return {
+        'agent_id': agent['id'],
+        'name': agent['name'],
+        'type': agent['type'],
+        'system_prompt': agent['system_prompt'],
+        'success_rate': agent['success_rate'],
+        'tasks_completed': agent['tasks_completed']
+    }
 
 
 @app.route('/health', methods=['GET'])
@@ -242,31 +258,54 @@ def execute_task():
         if not agent:
             agent = find_agent_for_task(task, agent_type)
 
-        if project_id and not lite_mode:
-            router.assign_agent_to_project(
-                agent['agent_id'],
-                project_id,
-                role=agent_type or 'general',
-                reason='API request'
-            )
+        agent_id = agent.get('agent_id')
+
+        if project_id and agent_id:
+            try:
+                router.assign_agent_to_project(
+                    agent_id,
+                    project_id,
+                    role=agent_type or 'general',
+                    reason='API request'
+                )
+            except Exception as assign_err:
+                # Log but don't fail if assignment fails
+                print(f"Warning: Agent assignment failed: {assign_err}")
 
         result = router.query_claude(
             task,
-            agent_id=agent.get('agent_id'),
+            agent_id=agent_id,
             project_id=project_id,
             use_tools=use_tools
         )
 
+        # Check for error in result
+        if result.get('error'):
+            return jsonify({
+                'error': result['error'],
+                'route': 'claude',
+                'agent': agent.get('name'),
+                'metrics': {
+                    'tokens': 0,
+                    'time_ms': result.get('execution_time_ms', 0)
+                }
+            }), 500
+
         return jsonify({
             'route': 'claude',
-            'agent': agent['name'],
-            'agent_type': agent['type'],
+            'agent': agent.get('name'),
+            'agent_type': agent.get('type'),
             'result': result.get('response', ''),
             'metrics': {
                 'tokens': result.get('tokens_used', 0),
                 'time_ms': result.get('execution_time_ms', 0)
             }
         })
+    except KeyError as e:
+        return jsonify({
+            'error': f'Missing required field: {e}',
+            'route': 'claude'
+        }), 500
     except Exception as e:
         return jsonify({
             'error': str(e),
