@@ -7,9 +7,16 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import time
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from config directory
+config_dir = Path(__file__).resolve().parent.parent.parent.parent / 'config'
+env_file = config_dir / '.env'
+if env_file.exists():
+    load_dotenv(env_file)
+else:
+    load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -273,7 +280,8 @@ def list_agents():
     if not lite_mode and router:
         try:
             router.cursor.execute("""
-                SELECT id, agent_name, agent_type, agent_purpose,
+                SELECT id, agent_name, agent_type,
+                       DBMS_LOB.SUBSTR(agent_purpose, 200, 1) as purpose,
                        success_rate, total_tasks_completed, last_used
                 FROM agent_repository
                 ORDER BY success_rate DESC NULLS LAST
@@ -285,13 +293,14 @@ def list_agents():
                     'id': row[0],
                     'name': row[1],
                     'type': row[2],
-                    'purpose': row[3][:200] if row[3] else None,
+                    'purpose': str(row[3]) if row[3] else None,
                     'success_rate': float(row[4]) if row[4] else 0.0,
                     'tasks_completed': row[5] or 0,
                     'last_used': row[6].isoformat() if row[6] else None
                 })
             return jsonify({'agents': agents})
-        except Exception:
+        except Exception as e:
+            print(f"Error fetching agents: {e}")
             pass
 
     # Lite mode fallback

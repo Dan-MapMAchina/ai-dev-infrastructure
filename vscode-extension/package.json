@@ -90,7 +90,7 @@
       "properties": {
         "claudeAiDev.backendUrl": {
           "type": "string",
-          "default": "http://localhost:5000",
+          "default": "http://localhost:5050",
           "description": "Backend service URL"
         },
         "claudeAiDev.autoRoute": {

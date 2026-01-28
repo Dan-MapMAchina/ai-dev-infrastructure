@@ -9,6 +9,7 @@ import time
 import hashlib
 from typing import Dict, Optional, List, Any, Literal
 from datetime import datetime
+from pathlib import Path
 
 import oracledb
 import ollama
@@ -17,7 +18,13 @@ from sentence_transformers import SentenceTransformer
 import numpy as np
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from config directory
+config_dir = Path(__file__).resolve().parent.parent.parent.parent / 'config'
+env_file = config_dir / '.env'
+if env_file.exists():
+    load_dotenv(env_file)
+else:
+    load_dotenv()
 
 
 class IntelligentAgentRouter:

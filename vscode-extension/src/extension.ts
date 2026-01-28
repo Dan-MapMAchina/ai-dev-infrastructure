@@ -46,7 +46,7 @@ let chatPanel: vscode.WebviewPanel | undefined;
 let dashboardPanel: vscode.WebviewPanel | undefined;
 
 function getBackendUrl(): string {
-    return vscode.workspace.getConfiguration('claudeAiDev').get('backendUrl') || 'http://localhost:5000';
+    return vscode.workspace.getConfiguration('claudeAiDev').get('backendUrl') || 'http://localhost:5050';
 }
 
 export function activate(context: vscode.ExtensionContext) {
