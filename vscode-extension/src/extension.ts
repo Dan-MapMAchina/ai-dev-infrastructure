@@ -620,7 +620,10 @@ async function updateProjectScope(backendUrl: string) {
                             'Add All', 'Select Tools', 'Skip'
                         );
 
+                        let toolsToAdd: ToolRecommendation[] = [];
+
                         if (addTools === 'Add All') {
+                            toolsToAdd = newTools;
                             currentConfig.tools = [
                                 ...(currentConfig.tools || []),
                                 ...newTools.map((t: any) => ({
@@ -646,6 +649,7 @@ async function updateProjectScope(backendUrl: string) {
                                 { canPickMany: true, placeHolder: 'Select tools to add' }
                             );
                             if (selected && selected.length > 0) {
+                                toolsToAdd = selected.map((s: any) => s.tool);
                                 currentConfig.tools = [
                                     ...(currentConfig.tools || []),
                                     ...selected.map((s: any) => ({
@@ -654,6 +658,24 @@ async function updateProjectScope(backendUrl: string) {
                                         reason: s.tool.reason
                                     }))
                                 ];
+                            }
+                        }
+
+                        // Write accepted tools to .mcp.json
+                        if (toolsToAdd.length > 0) {
+                            const mcpUpdated = updateMcpConfigFile(workspacePath, toolsToAdd);
+                            if (mcpUpdated) {
+                                vscode.window.showInformationMessage(
+                                    'MCP configuration updated. Restart Claude Code to enable new tools.',
+                                    'View .mcp.json'
+                                ).then(selection => {
+                                    if (selection === 'View .mcp.json') {
+                                        const mcpPath = path.join(workspacePath, '.mcp.json');
+                                        vscode.workspace.openTextDocument(mcpPath).then(doc => {
+                                            vscode.window.showTextDocument(doc);
+                                        });
+                                    }
+                                });
                             }
                         }
                     }
@@ -1012,47 +1034,110 @@ function generateAgentsJson(
     };
 }
 
+// MCP Server configurations - maps tool names to their MCP config
+const MCP_SERVER_CONFIGS: Record<string, any> = {
+    'filesystem': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-filesystem', '.']
+    },
+    'github': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-github'],
+        env: { GITHUB_PERSONAL_ACCESS_TOKEN: '' }
+    },
+    'postgresql': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-postgres'],
+        env: { DATABASE_URL: '' }
+    },
+    'memory': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-memory']
+    },
+    'puppeteer': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-puppeteer']
+    },
+    'fetch': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-fetch']
+    },
+    'brave-search': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-brave-search'],
+        env: { BRAVE_API_KEY: '' }
+    },
+    'sequential-thinking': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-sequential-thinking']
+    },
+    'sqlite': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-sqlite'],
+        env: { SQLITE_DB_PATH: '' }
+    },
+    'slack': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-slack'],
+        env: { SLACK_BOT_TOKEN: '' }
+    },
+    'git': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-git']
+    },
+    'time': {
+        command: 'npx',
+        args: ['-y', '@modelcontextprotocol/server-time']
+    }
+};
+
 function generateMcpConfig(
     recommendations: { essential: ToolRecommendation[]; recommended: ToolRecommendation[] }
 ): any {
     const servers: Record<string, any> = {};
-
     const allTools = [...recommendations.essential, ...recommendations.recommended];
 
     for (const tool of allTools) {
-        if (tool.name === 'filesystem') {
-            servers['filesystem'] = {
-                command: 'npx',
-                args: ['-y', '@modelcontextprotocol/server-filesystem', '.']
-            };
-        } else if (tool.name === 'github') {
-            servers['github'] = {
-                command: 'npx',
-                args: ['-y', '@modelcontextprotocol/server-github'],
-                env: { GITHUB_TOKEN: '${GITHUB_TOKEN}' }
-            };
-        } else if (tool.name === 'postgresql') {
-            servers['postgresql'] = {
-                command: 'npx',
-                args: ['-y', '@modelcontextprotocol/server-postgres'],
-                env: { DATABASE_URL: '${DATABASE_URL}' }
-            };
-        } else if (tool.name === 'memory') {
-            servers['memory'] = {
-                command: 'npx',
-                args: ['-y', '@modelcontextprotocol/server-memory']
-            };
-        } else if (tool.name === 'puppeteer') {
-            servers['puppeteer'] = {
-                command: 'npx',
-                args: ['-y', '@modelcontextprotocol/server-puppeteer']
-            };
+        const config = MCP_SERVER_CONFIGS[tool.name];
+        if (config) {
+            servers[tool.name] = { ...config };
         }
     }
 
-    return {
-        mcpServers: servers
-    };
+    return { mcpServers: servers };
+}
+
+function updateMcpConfigFile(workspacePath: string, newTools: ToolRecommendation[]): boolean {
+    const mcpConfigPath = path.join(workspacePath, '.mcp.json');
+    let existingConfig: any = { mcpServers: {} };
+
+    // Read existing config if present
+    if (fs.existsSync(mcpConfigPath)) {
+        try {
+            existingConfig = JSON.parse(fs.readFileSync(mcpConfigPath, 'utf-8'));
+            if (!existingConfig.mcpServers) {
+                existingConfig.mcpServers = {};
+            }
+        } catch {
+            existingConfig = { mcpServers: {} };
+        }
+    }
+
+    // Add new tools
+    let added = 0;
+    for (const tool of newTools) {
+        const config = MCP_SERVER_CONFIGS[tool.name];
+        if (config && !existingConfig.mcpServers[tool.name]) {
+            existingConfig.mcpServers[tool.name] = { ...config };
+            added++;
+        }
+    }
+
+    if (added > 0) {
+        fs.writeFileSync(mcpConfigPath, JSON.stringify(existingConfig, null, 2));
+        return true;
+    }
+    return false;
 }
 
 function getProjectId(): string {
