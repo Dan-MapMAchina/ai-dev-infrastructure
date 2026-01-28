@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "project": {
+    "name": "ai-dev-infrastructure",
+    "type": "fullstack",
+    "description": "complex project with Python, JavaScript, TypeScript"
+  },
+  "techStack": [
+    "Python",
+    "JavaScript",
+    "TypeScript",
+    "Python",
+    "Flask",
+    "Node.js",
+    "Next.js",
+    "Redis"
+  ],
+  "requirements": [
+    "database storage",
+    "containerization",
+    "API endpoints"
+  ],
+  "tools": [
+    {
+      "name": "filesystem",
+      "type": "filesystem",
+      "reason": "File operations",
+      "enabled": true
+    },
+    {
+      "name": "github",
+      "type": "git",
+      "reason": "Version control",
+      "enabled": true
+    },
+    {
+      "name": "memory",
+      "type": "knowledge_base",
+      "reason": "Context persistence",
+      "enabled": true
+    }
+  ],
+  "agents": [
+    {
+      "name": "Code Review Specialist",
+      "type": "code_review",
+      "enabled": true
+    },
+    {
+      "name": "Refactoring Specialist",
+      "type": "refactoring",
+      "enabled": true
+    }
+  ],
+  "settings": {
+    "autoRoute": true,
+    "showMetrics": true,
+    "cacheResponses": true
+  },
+  "lastUpdated": "2026-01-28T21:26:36.669Z"
+}
