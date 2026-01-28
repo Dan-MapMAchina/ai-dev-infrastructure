@@ -33,6 +33,11 @@
         "category": "Claude AI"
       },
       {
+        "command": "claudeAiDev.reviewProject",
+        "title": "Review Entire Project",
+        "category": "Claude AI"
+      },
+      {
         "command": "claudeAiDev.refactor",
         "title": "Refactor Selected Code",
         "category": "Claude AI"

@@ -56,6 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('claudeAiDev.chat', () => showChat(getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.codeReview', () => executeAgentTask('code_review', getBackendUrl())),
+        vscode.commands.registerCommand('claudeAiDev.reviewProject', () => reviewEntireProject(getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.refactor', () => executeAgentTask('refactoring', getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.generateTests', () => executeAgentTask('testing', getBackendUrl())),
         vscode.commands.registerCommand('claudeAiDev.explainCode', () => explainCode(getBackendUrl())),
@@ -175,6 +176,160 @@ async function executeAgentTask(agentType: string, backendUrl: string) {
 
         } catch (error: any) {
             vscode.window.showErrorMessage(`Error: ${error.message}`);
+        }
+    });
+}
+
+async function reviewEntireProject(backendUrl: string) {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage('Please open a folder first');
+        return;
+    }
+
+    const workspacePath = workspaceFolder.uri.fsPath;
+
+    // Supported code file extensions
+    const codeExtensions = [
+        '.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java',
+        '.cs', '.rb', '.php', '.swift', '.kt', '.scala', '.c', '.cpp',
+        '.h', '.hpp', '.vue', '.svelte'
+    ];
+
+    // Directories to ignore
+    const ignoreDirs = [
+        'node_modules', '.git', 'dist', 'build', 'out', '__pycache__',
+        'venv', '.venv', 'vendor', 'target', '.next', '.nuxt', 'coverage'
+    ];
+
+    // Max file size (50KB) and total size (500KB) to avoid token limits
+    const MAX_FILE_SIZE = 50 * 1024;
+    const MAX_TOTAL_SIZE = 500 * 1024;
+
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'Reviewing entire project...',
+        cancellable: true
+    }, async (progress, token) => {
+        try {
+            progress.report({ message: 'Scanning project files...' });
+
+            // Collect code files
+            const codeFiles: { path: string; content: string; language: string }[] = [];
+            let totalSize = 0;
+
+            const scanDir = async (dir: string, depth: number = 0): Promise<void> => {
+                if (depth > 5 || token.isCancellationRequested) return;
+
+                const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+                for (const entry of entries) {
+                    if (token.isCancellationRequested) return;
+
+                    const fullPath = path.join(dir, entry.name);
+                    const relativePath = path.relative(workspacePath, fullPath);
+
+                    if (entry.isDirectory()) {
+                        if (!ignoreDirs.includes(entry.name) && !entry.name.startsWith('.')) {
+                            await scanDir(fullPath, depth + 1);
+                        }
+                    } else if (entry.isFile()) {
+                        const ext = path.extname(entry.name).toLowerCase();
+                        if (codeExtensions.includes(ext)) {
+                            try {
+                                const stats = fs.statSync(fullPath);
+                                if (stats.size <= MAX_FILE_SIZE && totalSize + stats.size <= MAX_TOTAL_SIZE) {
+                                    const content = fs.readFileSync(fullPath, 'utf-8');
+                                    codeFiles.push({
+                                        path: relativePath,
+                                        content: content,
+                                        language: ext.slice(1)
+                                    });
+                                    totalSize += stats.size;
+                                }
+                            } catch {
+                                // Skip files that can't be read
+                            }
+                        }
+                    }
+                }
+            };
+
+            await scanDir(workspacePath);
+
+            if (codeFiles.length === 0) {
+                vscode.window.showWarningMessage('No code files found in project');
+                return;
+            }
+
+            progress.report({ message: `Found ${codeFiles.length} files. Analyzing...` });
+
+            // Build review request
+            const filesSummary = codeFiles.map(f =>
+                `\n--- ${f.path} (${f.language}) ---\n${f.content}`
+            ).join('\n');
+
+            const reviewPrompt = `Review this entire codebase for:
+1. Security vulnerabilities (OWASP Top 10)
+2. Performance issues and bottlenecks
+3. Code quality and best practices
+4. Architecture concerns
+5. Potential bugs
+
+Project: ${workspaceFolder.name}
+Files: ${codeFiles.length}
+
+${filesSummary}
+
+Provide a comprehensive review organized by category with specific file references.`;
+
+            progress.report({ message: 'Running AI code review...' });
+
+            const response = await axios.post(`${backendUrl}/execute-task`, {
+                task: reviewPrompt,
+                project_id: getProjectId(),
+                agent_type: 'code_review',
+                use_tools: false
+            }, { ...axiosConfig, timeout: 120000 }); // 2 minute timeout for large reviews
+
+            // Show results
+            const resultContent = `# Project Code Review: ${workspaceFolder.name}
+
+**Files Analyzed:** ${codeFiles.length}
+**Total Size:** ${Math.round(totalSize / 1024)}KB
+**Route:** ${response.data.route}
+**Agent:** ${response.data.agent || 'Code Review Specialist'}
+${response.data.metrics ? `**Time:** ${response.data.metrics.time_ms}ms` : ''}
+
+---
+
+## Files Included
+
+${codeFiles.map(f => `- \`${f.path}\``).join('\n')}
+
+---
+
+## Review Results
+
+${response.data.result}
+`;
+
+            const doc = await vscode.workspace.openTextDocument({
+                content: resultContent,
+                language: 'markdown'
+            });
+            await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+
+            vscode.window.showInformationMessage(
+                `Project review complete: ${codeFiles.length} files analyzed`
+            );
+
+        } catch (error: any) {
+            if (token.isCancellationRequested) {
+                vscode.window.showInformationMessage('Review cancelled');
+            } else {
+                vscode.window.showErrorMessage(`Review failed: ${error.message}`);
+            }
         }
     });
 }
