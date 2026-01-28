@@ -22,10 +22,13 @@ services:
       - ai-dev-network
 
   backend:
-    build:
-      context: ../backend
-      dockerfile: Dockerfile
+    image: ghcr.io/dan-mapmachina/ai-dev-infrastructure/backend:latest
+    # To build locally instead, comment out 'image' and uncomment 'build':
+    # build:
+    #   context: ../backend
+    #   dockerfile: Dockerfile
     container_name: ai-dev-backend
+    pull_policy: always
     ports:
       - "5000:5000"
     environment:
