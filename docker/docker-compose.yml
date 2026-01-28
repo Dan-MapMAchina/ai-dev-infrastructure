@@ -30,12 +30,12 @@ services:
     container_name: ai-dev-backend
     pull_policy: always
     ports:
-      - "5000:5000"
+      - "5050:5050"
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ORACLE_USER=${ORACLE_USER:-aidev}
       - ORACLE_PASSWORD=${ORACLE_PASSWORD:-AiDev123}
-      - ORACLE_DSN=oracle26ai:1521/FREEPDB1
+      - ORACLE_DSN=${ORACLE_DSN:-oracle26ai:1521/FREEPDB1}
       - OLLAMA_HOST=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379
     depends_on:
