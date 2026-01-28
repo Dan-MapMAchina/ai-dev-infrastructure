@@ -35,12 +35,11 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ORACLE_USER=${ORACLE_USER:-aidev}
       - ORACLE_PASSWORD=${ORACLE_PASSWORD:-AiDev123}
-      - ORACLE_DSN=${ORACLE_DSN:-oracle26ai:1521/FREEPDB1}
+      - ORACLE_DSN=${ORACLE_DSN:-host.docker.internal:1521/FREEPDB1}
       - OLLAMA_HOST=http://host.docker.internal:11434
       - REDIS_URL=redis://redis:6379
-    depends_on:
-      oracle26ai:
-        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../backend/src:/app/src
     networks:

@@ -161,47 +161,55 @@ class IntelligentAgentRouter:
         project_id: Optional[str] = None,
         agent_type: Optional[str] = None
     ) -> Optional[Dict]:
-        """Find most suitable agent using vector similarity and performance"""
-        task_embedding = self.embedding_model.encode(task_description).tolist()
+        """Find most suitable agent using type matching and performance"""
+        try:
+            # Try simple type-based matching first (more reliable)
+            if agent_type:
+                query = """
+                    SELECT id, agent_name, agent_type, system_prompt, tools_enabled,
+                           success_rate, total_tasks_completed
+                    FROM agent_repository
+                    WHERE agent_type = :agent_type
+                    ORDER BY success_rate DESC NULLS LAST, routing_priority DESC
+                    FETCH FIRST 1 ROWS ONLY
+                """
+                self.cursor.execute(query, {'agent_type': agent_type})
+            else:
+                # Get best performing agent
+                query = """
+                    SELECT id, agent_name, agent_type, system_prompt, tools_enabled,
+                           success_rate, total_tasks_completed
+                    FROM agent_repository
+                    ORDER BY routing_priority DESC, success_rate DESC NULLS LAST
+                    FETCH FIRST 1 ROWS ONLY
+                """
+                self.cursor.execute(query)
 
-        # Build query
-        query = """
-            SELECT
-                id, agent_name, agent_type, system_prompt, tools_enabled,
-                success_rate, total_tasks_completed,
-                VECTOR_DISTANCE(agent_embedding, :embedding, EUCLIDEAN) as distance
-            FROM agent_repository
-            WHERE 1=1
-        """
-        params = {'embedding': np.array(task_embedding, dtype=np.float32)}
-
-        if agent_type:
-            query += " AND agent_type = :agent_type"
-            params['agent_type'] = agent_type
-
-        query += """
-            ORDER BY
-                distance ASC,
-                success_rate DESC NULLS LAST,
-                routing_priority DESC
-            FETCH FIRST 1 ROWS ONLY
-        """
-
-        self.cursor.execute(query, params)
-        row = self.cursor.fetchone()
+            row = self.cursor.fetchone()
+        except Exception as e:
+            print(f"Agent search error: {e}")
+            row = None
 
         if not row:
             return None
+
+        # Handle LOB types by reading their content
+        system_prompt = row[3]
+        if hasattr(system_prompt, 'read'):
+            system_prompt = system_prompt.read()
+
+        tools_enabled = row[4]
+        if hasattr(tools_enabled, 'read'):
+            tools_enabled = tools_enabled.read()
 
         return {
             'agent_id': row[0],
             'name': row[1],
             'type': row[2],
-            'system_prompt': row[3],
-            'tools_enabled': json.loads(row[4]) if row[4] else [],
+            'system_prompt': system_prompt,
+            'tools_enabled': json.loads(tools_enabled) if tools_enabled else [],
             'success_rate': float(row[5] or 0.0),
-            'tasks_completed': row[6] or 0,
-            'similarity_distance': float(row[7])
+            'tasks_completed': row[6] or 0
         }
 
     def assign_agent_to_project(
@@ -214,14 +222,14 @@ class IntelligentAgentRouter:
         """Assign agent to project"""
         self.cursor.execute("""
             MERGE INTO project_agent_assignments t
-            USING (SELECT :1 as project_id, :2 as agent_id FROM dual) s
+            USING (SELECT :project_id as project_id, :agent_id as agent_id FROM dual) s
             ON (t.project_id = s.project_id AND t.agent_id = s.agent_id)
             WHEN MATCHED THEN
                 UPDATE SET is_active = 'Y', last_active = CURRENT_TIMESTAMP
             WHEN NOT MATCHED THEN
                 INSERT (project_id, agent_id, assigned_role, assignment_reason)
-                VALUES (:1, :2, :3, :4)
-        """, [project_id, agent_id, role, reason])
+                VALUES (:project_id, :agent_id, :role, :reason)
+        """, {'project_id': project_id, 'agent_id': agent_id, 'role': role, 'reason': reason})
         self.connection.commit()
 
     # === QUERY EXECUTION ===
@@ -375,16 +383,16 @@ class IntelligentAgentRouter:
                 total_tasks_completed = total_tasks_completed + 1,
                 success_rate = (
                     SELECT AVG(CASE WHEN success = 'Y' THEN 1 ELSE 0 END)
-                    FROM agent_execution_history WHERE agent_id = :1
+                    FROM agent_execution_history WHERE agent_id = :agent_id
                 ),
                 average_execution_time_ms = (
                     SELECT AVG(execution_time_ms)
-                    FROM agent_execution_history WHERE agent_id = :1
+                    FROM agent_execution_history WHERE agent_id = :agent_id
                 ),
                 last_used = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = :1
-        """, [agent_id])
+            WHERE id = :agent_id
+        """, {'agent_id': agent_id})
 
         # Update project assignment
         self.cursor.execute("""
@@ -394,11 +402,11 @@ class IntelligentAgentRouter:
                 project_success_rate = (
                     SELECT AVG(CASE WHEN success = 'Y' THEN 1 ELSE 0 END)
                     FROM agent_execution_history
-                    WHERE agent_id = :1 AND project_id = :2
+                    WHERE agent_id = :agent_id AND project_id = :project_id
                 ),
                 last_active = CURRENT_TIMESTAMP
-            WHERE agent_id = :1 AND project_id = :2
-        """, [agent_id, project_id])
+            WHERE agent_id = :agent_id AND project_id = :project_id
+        """, {'agent_id': agent_id, 'project_id': project_id})
 
         self.connection.commit()
 
@@ -494,11 +502,21 @@ class IntelligentAgentRouter:
         if not row:
             return {}
 
+        # Handle LOB types
+        def read_lob(val):
+            if hasattr(val, 'read'):
+                return val.read()
+            return val
+
+        system_prompt = read_lob(row[1])
+        tools_enabled = read_lob(row[2])
+        learned_patterns = read_lob(row[3])
+
         return {
             'name': row[0],
-            'system_prompt': row[1],
-            'tools_enabled': json.loads(row[2] or '[]'),
-            'learned_patterns': json.loads(row[3] or '{}')
+            'system_prompt': system_prompt,
+            'tools_enabled': json.loads(tools_enabled or '[]'),
+            'learned_patterns': json.loads(learned_patterns or '{}')
         }
 
     def _log_routing(
