@@ -287,21 +287,16 @@ class IntelligentAgentRouter:
         messages = conversation_history or []
         messages.append({"role": "user", "content": prompt})
 
-        # Configure tools
-        tools = None
-        if use_tools:
-            tools = [
-                {"type": "bash_20250124", "name": "bash"},
-                {"type": "text_editor_20250124", "name": "text_editor"}
-            ]
+        # Note: Computer Use tools (bash_20250124, text_editor_20250124) require
+        # beta headers and are not used for standard code review/assistance tasks.
+        # For now, we don't pass tools to avoid API errors.
 
         try:
             response = self.claude_client.messages.create(
                 model="claude-sonnet-4-20250514",
                 max_tokens=16000,
                 system=system_prompt,
-                messages=messages,
-                tools=tools if tools else anthropic.NOT_GIVEN
+                messages=messages
             )
 
             processing_time = int((time.time() - start_time) * 1000)
