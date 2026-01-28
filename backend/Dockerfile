@@ -1,11 +1,12 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Note: libaio1 renamed to libaio1t64 in newer Debian, using libaio-dev for compatibility
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    libaio1 \
+    libaio-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for caching
